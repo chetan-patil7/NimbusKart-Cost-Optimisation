@@ -1,0 +1,76 @@
+name: Cost Janitor
+
+on:
+  pull_request:
+
+jobs:
+  cost-janitor:
+
+    runs-on: ubuntu-latest
+
+    services:
+      localstack:
+        image: localstack/localstack
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: ec2,s3,sts
+          DEBUG: 1
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install dependencies
+        run: |
+          pip install -r janitor/requirements.txt
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      - name: Create orphan Elastic IP
+        run: |
+          aws configure set aws_access_key_id test
+          aws configure set aws_secret_access_key test
+          aws configure set default.region us-east-1
+
+          aws --endpoint-url=http://localhost:4566 \
+            ec2 allocate-address
+
+      - name: Run Cost Janitor
+        run: |
+          python janitor/janitor.py --dry-run
+
+        continue-on-error: true
+
+      - name: Upload JSON Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-json
+          path: report.json
+
+      - name: Upload Markdown Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-summary
+          path: summary.md
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: summary.md
