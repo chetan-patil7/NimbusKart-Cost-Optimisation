@@ -31,8 +31,7 @@ def get_tag_dict(tags):
 
 
 def has_missing_tags(tags):
-    return [tag for tag in REQUIRED_TAGS if tag not in tags]
-
+    return list(set(REQUIRED_TAGS) - set(tags.keys()))
 
 def add_finding(
     resource_id,
@@ -136,15 +135,18 @@ def scan_eips(delete_mode):
 
     for address in response["Addresses"]:
 
-        if "InstanceId" not in address:
+        instance_id = address.get("InstanceId")
 
-            allocation_id = address.get(
-                "AllocationId",
-                address.get("PublicIp")
-            )
+        # orphaned if None OR empty
+        if not instance_id:
+
+            allocation_id = address.get("AllocationId")
+            public_ip = address.get("PublicIp")
+
+            resource_id = allocation_id if allocation_id else public_ip
 
             add_finding(
-                allocation_id,
+                resource_id,
                 "elastic_ip",
                 "unassociated",
                 0,
@@ -154,11 +156,8 @@ def scan_eips(delete_mode):
                 True
             )
 
-            if delete_mode:
-                if "AllocationId" in address:
-                    ec2.release_address(
-                        AllocationId=address["AllocationId"]
-                    )
+            if delete_mode and allocation_id:
+                ec2.release_address(AllocationId=allocation_id)
 
 
 def scan_missing_tags():
@@ -167,14 +166,14 @@ def scan_missing_tags():
     for reservation in response["Reservations"]:
         for instance in reservation["Instances"]:
 
+            instance_id = instance["InstanceId"]
             tags = get_tag_dict(instance.get("Tags", []))
 
             missing = has_missing_tags(tags)
 
             if missing:
-
                 add_finding(
-                    instance["InstanceId"],
+                    instance_id,
                     "ec2_instance",
                     f"missing_tags:{','.join(missing)}",
                     0,
