@@ -5,7 +5,6 @@ on:
 
 jobs:
   cost-janitor:
-
     runs-on: ubuntu-latest
 
     services:
@@ -18,7 +17,6 @@ jobs:
           DEBUG: 1
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -27,12 +25,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Terraform
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Install dependencies
         run: |
           pip install -r janitor/requirements.txt
+
+      - name: Wait for LocalStack
+        run: |
+          until curl -s http://localhost:4566/_localstack/health; do
+            echo "Waiting for LocalStack..."
+            sleep 5
+          done
 
       - name: Terraform Init
         working-directory: terraform
@@ -44,17 +54,12 @@ jobs:
 
       - name: Create orphan Elastic IP
         run: |
-          aws configure set aws_access_key_id test
-          aws configure set aws_secret_access_key test
-          aws configure set default.region us-east-1
-
           aws --endpoint-url=http://localhost:4566 \
             ec2 allocate-address
 
       - name: Run Cost Janitor
         run: |
           python janitor/janitor.py --dry-run
-
         continue-on-error: true
 
       - name: Upload JSON Report
