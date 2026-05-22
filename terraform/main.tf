@@ -107,6 +107,8 @@ resource "aws_s3_bucket_versioning" "versioning" {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
+  count = var.environment == "prod" ? 1 : 0
+
   bucket = aws_s3_bucket.logs_bucket.id
 
   rule {
@@ -114,7 +116,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "lifecycle" {
     status = "Enabled"
 
     filter {
-      prefix = "" # applies to entire bucket
+      prefix = ""
     }
 
     noncurrent_version_expiration {
