@@ -1,42 +1,12 @@
-```markdown
-# DESIGN.md
-
 ## 1. Multi-Cloud Design (AWS → GCP → Azure)
 
 The current Janitor is designed around AWS SDK calls (boto3). To support multiple cloud providers without rewriting the core logic, the system must be split into **three clear layers**:
 
+
 ### Proposed Architecture
 
-```
+<img width="1536" height="1024" alt="NimbusKart Architecture" src="https://github.com/user-attachments/assets/6d2cf6cf-cd2c-4ee1-9fc5-3832d091d253" />
 
-janitor/
-├── core/
-│   ├── engine.py          # Orchestration logic (scan → evaluate → report)
-│   ├── normalizer.py      # Converts provider output into common schema
-│   ├── policy_engine.py   # Rules: orphan detection, tag validation, age checks
-│
-├── providers/
-│   ├── aws/
-│   │   ├── ec2.py
-│   │   ├── ebs.py
-│   │   ├── eip.py
-│   │   └── s3.py
-│   │
-│   ├── gcp/
-│   │   ├── compute.py
-│   │   ├── disk.py
-│   │   └── network.py
-│   │
-│   └── azure/
-│       ├── vm.py
-│       ├── disk.py
-│       └── network.py
-│
-└── shared/
-├── models.py          # Unified resource model
-└── constants.py
-
-````
 
 ### Key Idea: Normalized Resource Model
 
