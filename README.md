@@ -63,13 +63,39 @@ python janitor/janitor.py --dry-run
 
 ## Decisions & deviations
 
-* Used LocalStack instead of real AWS to avoid cloud costs during development
-* Used Terraform provider endpoint overrides for local AWS simulation
-* Implemented tag-based governance using a static REQUIRED_TAGS policy
-* Chose GitHub Actions artifacts instead of committing generated reports to repository
-* Used PR-based CI execution instead of direct main branch execution
-* Added manual simulation of orphan resources for testing cost leakage scenarios
+- Allowed SSH access from `0.0.0.0/0` only to match the assignment requirement; this is unsafe for production and should normally be restricted to trusted IP ranges or VPN access.
 
+- Used LocalStack instead of a real AWS account to ensure the entire project remains free, reproducible, and safe for testing.
+
+- Added common Terraform tags through reusable locals/variables to guarantee all supported resources consistently receive mandatory tags.
+
+- Kept the infrastructure in a single AWS region (`us-east-1`) because multi-region support was outside the assignment scope.
+
+- Used static monthly pricing estimates for orphaned resources because LocalStack does not provide real AWS billing data.
+
+- Implemented the Janitor in Python instead of Bash for better structure, extensibility, JSON handling, and testability.
+
+- The `--dry-run` mode is enabled by default to prioritize safety and prevent accidental deletions.
+
+- Resources tagged with `Protected=true` are skipped even in `--delete` mode to reduce the risk of destructive automation mistakes.
+
+- The intentionally unattached EBS volume was preserved because the assignment explicitly requires a known orphan resource for testing the Janitor workflow.
+
+- Used modular Terraform structure (`modules/network`) instead of a flat configuration to improve maintainability and reusability.
+
+- Lifecycle cleanup was implemented only for non-current S3 object versions after 30 days, as requested by the specification.
+
+- The GitHub Actions workflow fails intentionally when orphaned resources are detected in `--dry-run` mode so that cost issues are visible during pull request reviews.
+
+- Assumed LocalStack feature compatibility for EC2, S3, EBS, and networking resources because some AWS services behave differently in emulated environments.
+
+- Did not implement automatic remediation approvals or notification integrations (Slack/Email) to keep the scope aligned with the assignment time budget.
+
+- Chose not to auto-delete stopped EC2 instances by default because stopped instances may still contain important data or attached volumes.
+
+- Used Terraform variables with defaults instead of hardcoding environment values to make the setup reusable across environments.
+
+- Treated missing mandatory tags as a cost hygiene issue because untagged resources cannot be reliably attributed to teams or projects.
 ## Trade-offs
 
 * Did not integrate real AWS accounts due to cost and security constraints
