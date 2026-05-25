@@ -11,10 +11,6 @@ NimbusKart wants:
 * GCP later
 * Azure later
 
-So explain:
-
-* how you would avoid rewriting everything.
-
 ### Include
 
 * modular architecture
@@ -64,14 +60,6 @@ Examples:
 * TerminateInstances
 * ReleaseAddress
 
-### IMPORTANT
-
-Include:
-
-* minimal IAM JSON policy
-
-This is mandatory.
-
 ---
 
 # 3. Safety Net
@@ -91,18 +79,6 @@ Deleting stopped EC2 used for DR/backups.
 Deleting unattached EBS containing important data.
 
 ---
-
-## Then explain guardrails
-
-Examples:
-
-* `Protected=true`
-* approval workflow
-* quarantine period
-* snapshot before delete
-* age thresholds
-
-This section is very important for scoring.
 
 ---
 
@@ -138,22 +114,20 @@ Also mention:
 
 # 5. What You Did NOT Build
 
-This is about:
+This implementation intentionally does not include:
+- multi-account AWS Organizations support
+- real AWS billing API integration
+- RBAC dashboards
+- automated approval systems
+- machine learning-based cost prediction
 
-* honest scoping
+The project was intentionally scoped as a safe local-first proof-of-concept focused on:
+- Infrastructure as Code
+- orphan resource detection
+- CI/CD integration
+- tagging governance
+- safe cleanup workflows
 
-Mention things intentionally skipped.
-
-Examples:
-
-* multi-account support
-* real billing APIs
-* RBAC dashboards
-* approval systems
-
-Then explain:
-
-* kept project lightweight
-* focused on safe local reproducible demo
+while avoiding real cloud costs and production complexity.
 
 ---
