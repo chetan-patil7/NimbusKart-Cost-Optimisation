@@ -102,13 +102,22 @@ python janitor/janitor.py --dry-run
 * Limited scaling design (single-run batch scanner instead of continuous monitoring)
 * No advanced policy engine (like OPA or AWS Config) implemented yet
 
-## AI usage disclosure
+## AI Usage Disclosure
 
-This project was developed with assistance from an AI coding assistant to help with:
+This project was built using ChatGPT.
 
-* Debugging Terraform and LocalStack configuration issues
-* Designing Python-based resource scanning logic
-* Structuring GitHub Actions CI/CD workflow
-* Improving documentation clarity and formatting
+### Usage
+- Used for Terraform architecture design and module structure
+- Helped implement Cost Janitor logic (orphan detection + reporting)
+- Assisted in GitHub Actions CI/CD workflow setup
+- Helped write DESIGN.md and documentation
 
-All final decisions, implementation, and validation were reviewed and applied manually by the developer.
+### Issue Found
+ChatGPT suggested using `http://localstack:4566` for CI, which failed in GitHub Actions.  
+It was corrected to `http://localhost:4566` after testing.
+
+### Manual Work
+CI/CD workflow debugging and fixing LocalStack execution timing was done manually due to environment-specific behavior.
+```
+
+All final decisions, implementation, and validation were reviewed and applied manually by myself.

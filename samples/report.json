@@ -1,5 +1,5 @@
 {
-  "scan_timestamp": "2026-05-22T18:37:24Z",
+  "scan_timestamp": "2026-05-25T03:56:07Z",
   "account_id": "000000000000",
   "region": "us-east-1",
   "summary": {
@@ -8,23 +8,23 @@
   },
   "findings": [
     {
-      "resource_id": "vol-6a499739",
+      "resource_id": "vol-4d1a13b7",
       "resource_type": "ebs_volume",
       "reason": "unattached",
       "age_days": 0,
       "estimated_monthly_cost_usd": 0.8,
       "tags": {
         "Environment": "staging",
-        "Name": "orphan-ebs-volume",
         "Project": "NimbusKart",
         "ManagedBy": "terraform",
+        "Name": "orphan-ebs-volume",
         "Owner": "platform-team"
       },
       "suggested_action": "delete",
       "safe_to_auto_delete": true
     },
     {
-      "resource_id": "eipalloc-ee484eeb",
+      "resource_id": "eipalloc-950b537e",
       "resource_type": "elastic_ip",
       "reason": "unassociated",
       "age_days": 0,
@@ -34,9 +34,9 @@
       "safe_to_auto_delete": true
     },
     {
-      "resource_id": "i-097759f602a55b4b0",
+      "resource_id": "i-5d542d5ad3fde76c8",
       "resource_type": "ec2_instance",
-      "reason": "missing_tags:Project,Owner,Environment",
+      "reason": "missing_tags:Owner,Environment,Project",
       "age_days": 0,
       "estimated_monthly_cost_usd": 0,
       "tags": {},
