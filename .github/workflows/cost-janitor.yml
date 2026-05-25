@@ -3,20 +3,36 @@ name: Cost Janitor
 on:
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   cost-janitor:
+
     runs-on: ubuntu-latest
 
     services:
       localstack:
-        image: localstack/localstack
+        image: localstack/localstack:3.0.2
+
         ports:
           - 4566:4566
+
         env:
           SERVICES: ec2,s3,sts
+          AWS_DEFAULT_REGION: us-east-1
           DEBUG: 1
 
+        options: >-
+          --health-cmd="curl -f http://localhost:4566/_localstack/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -25,22 +41,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install AWS CLI
+      - name: Install Python dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          pip install -r janitor/requirements.txt
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Install dependencies
-        run: |
-          pip install -r janitor/requirements.txt
-
       - name: Wait for LocalStack
         run: |
-          until curl -s http://localhost:4566/_localstack/health; do
-            echo "Waiting for LocalStack..."
+          for i in {1..30}; do
+            curl http://localhost:4566/_localstack/health && break
             sleep 5
           done
 
@@ -48,18 +59,29 @@ jobs:
         working-directory: terraform
         run: terraform init
 
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
       - name: Terraform Apply
         working-directory: terraform
         run: terraform apply -auto-approve
 
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id test
+          aws configure set aws_secret_access_key test
+          aws configure set default.region us-east-1
+
       - name: Create orphan Elastic IP
         run: |
           aws --endpoint-url=http://localhost:4566 \
-            ec2 allocate-address
+          ec2 allocate-address
 
       - name: Run Cost Janitor
         run: |
           python janitor/janitor.py --dry-run
+
         continue-on-error: true
 
       - name: Upload JSON Report
@@ -74,7 +96,7 @@ jobs:
           name: markdown-summary
           path: summary.md
 
-      - name: Comment PR
+      - name: Comment PR with Findings
         if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
