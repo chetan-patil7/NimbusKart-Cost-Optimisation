@@ -1,5 +1,3 @@
-Your `DESIGN.md` should mainly contain these 5 sections.
-
 ---
 
 # 1. Multi-Cloud Reality
