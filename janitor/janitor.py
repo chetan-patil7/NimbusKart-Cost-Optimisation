@@ -207,7 +207,7 @@ def generate_report():
         "findings": findings
     }
 
-    with open("report.json", "w") as f:
+    with open("samples/report.json", "w") as f:
         json.dump(report, f, indent=2)
 
     generate_markdown(report)
@@ -238,7 +238,7 @@ def generate_markdown(report):
             f"{finding['reason']}"
         )
 
-    with open("summary.md", "w") as f:
+    with open("samples/summary.md", "w") as f:
         f.write("\n".join(lines))
 
 

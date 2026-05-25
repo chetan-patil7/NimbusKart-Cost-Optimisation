@@ -1,257 +1,114 @@
 # NimbusKart Cost Janitor
 
-A FinOps-style cloud cost optimization and governance simulator built using Terraform, LocalStack, Python (boto3), and GitHub Actions.
+## Overview
 
----
+NimbusKart Cost Janitor is a FinOps simulation project that detects unused and non-compliant cloud resources in a safe LocalStack environment. It automates infrastructure provisioning with Terraform, scans for cost leaks using a Python-based janitor, and integrates with GitHub Actions to validate cloud hygiene during pull requests.
 
-# Overview
+## How to run locally
 
-NimbusKart Cost Janitor identifies unused or non-compliant cloud resources in a simulated AWS environment and generates cost and compliance reports.
+````bash
+# Clone repository
+git clone https://github.com/chetan-patil7/NimbusKart-Cost-Optimisation.git
+cd NimbusKart-Cost-Optimisation
 
-It focuses on detecting common cloud waste patterns and automating reporting during CI/CD runs.
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
----
+# Install Python dependencies
+pip install -r janitor/requirements.txt
 
-# What this project does
-
-The system scans and reports:
-
-* Unattached EBS volumes
-* Unassociated Elastic IPs (EIPs)
-* Stopped EC2 instances
-* Missing or incomplete resource tags
-
-It generates:
-
-* JSON report (`report.json`)
-* Markdown summary (`summary.md`)
-* GitHub PR comments (via CI)
-
----
-
-# Key Judgements / Findings
-
-## 1. Orphaned Storage (EBS Volumes)
-
-### Observation
-
-EBS volumes can remain unattached but still incur cost.
-
-### Detection Logic
-
-* Volume state = `available`
-
-### Risk
-
-* Silent cost leakage
-
-### Prevention
-
-* Auto-tag lifecycle policies
-* Delete unattached volumes after threshold (e.g., 7–30 days)
-* Enforce attachment via IaC (Terraform modules)
-
----
-
-## 2. Orphaned Elastic IPs (EIPs)
-
-### Observation
-
-Elastic IPs not attached to instances still generate cost.
-
-### Detection Logic
-
-* No `InstanceId` associated
-
-### Risk
-
-* High recurring cost waste
-
-### Prevention
-
-* Auto-release unused EIPs
-* Use NAT Gateway instead of multiple public IPs
-* Enforce tagging + ownership
-
----
-
-## 3. Stopped EC2 Instances
-
-### Observation
-
-Stopped instances still incur storage costs.
-
-### Detection Logic
-
-* Instance state = `stopped`
-* Age threshold exceeded
-
-### Risk
-
-* Idle compute cost
-
-### Prevention
-
-* Auto-terminate after inactivity threshold
-* Use auto-scaling groups instead of static instances
-
----
-
-## 4. Missing / Incomplete Tags
-
-### Observation
-
-Some resources are created without required governance tags.
-
-### Detection Logic
-
-Required tags:
-
-* Owner
-* Project
-* Environment
-* Tier
-
-### Risk
-
-* No accountability
-* No cost tracking
-* Poor governance visibility
-
-### Prevention
-
-* Enforce tagging policies via:
-
-  * Terraform validation
-  * AWS Config rules
-  * CI/CD checks (GitHub Actions)
-
----
-
-# How to Avoid These Issues in Real Systems
-
-## 1. Enforce Tag Policies Early
-
-* Use Terraform `validation` rules
-* Use OPA / Sentinel policies
-
----
-
-## 2. Automate Cleanup
-
-* Lambda-based janitor jobs
-* Scheduled AWS EventBridge rules
-
----
-
-## 3. CI/CD Governance
-
-* Run scans on every Pull Request
-* Block merges if orphan resources exceed threshold
-
----
-
-## 4. Cost Monitoring
-
-* Enable AWS Cost Explorer alerts
-* Integrate CloudWatch billing alarms
-
----
-
-## 5. Infrastructure Design Improvements
-
-* Use Auto Scaling Groups
-* Prefer managed services over raw EC2
-* Use lifecycle policies for storage
-
----
-
-# Basic Project Walkthrough
-
-## Step 1: Start Local Environment
-
-```bash
-cd terraform
+# Start LocalStack
 docker compose up -d
-```
 
----
-
-## Step 2: Provision Infrastructure
-
-```bash
+# Initialize Terraform
+cd terraform
 terraform init
 terraform apply -auto-approve
-```
 
----
+# Go back to root
+cd ..
 
-## Step 3: Simulate Cost Waste
-
-```bash
+# Create sample orphan resource
 aws --endpoint-url=http://localhost:4566 ec2 allocate-address
-```
 
----
-
-## Step 4: Run Janitor
-
-```bash
+# Run janitor
 python janitor/janitor.py --dry-run
+```bash
+# Clone repository
+git clone https://github.com/chetan-patil7/NimbusKart-Cost-Optimisation.git
+cd NimbusKart-Cost-Optimisation
+
+# Start LocalStack
+docker compose up -d
+
+# Initialize Terraform
+cd terraform
+terraform init
+terraform apply -auto-approve
+
+# Go back to root
+cd ..
+
+# Create sample orphan resource
+aws --endpoint-url=http://localhost:4566 ec2 allocate-address
+
+# Run janitor
+python janitor/janitor.py --dry-run
+````
+
+## Architecture
+
+```
++-------------------+        +------------------+
+|   GitHub Actions  | -----> |   LocalStack     |
+| (CI/CD Pipeline)  |        | (AWS Emulator)   |
++-------------------+        +------------------+
+           |                          |
+           v                          v
++-------------------+        +------------------+
+|   Terraform       | -----> | AWS Resources     |
+| (IaC Provisioning)|        | EC2 / EBS / EIP   |
++-------------------+        +------------------+
+           |
+           v
++-------------------+
+| Python Janitor    |
+| (Cost Scanner)    |
++-------------------+
+           |
+           v
++-------------------+
+| Reports           |
+| report.json       |
+| summary.md        |
++-------------------+
 ```
 
----
+## Decisions & deviations
 
-## Step 5: View Reports
+* Used LocalStack instead of real AWS to avoid cloud costs during development
+* Used Terraform provider endpoint overrides for local AWS simulation
+* Implemented tag-based governance using a static REQUIRED_TAGS policy
+* Chose GitHub Actions artifacts instead of committing generated reports to repository
+* Used PR-based CI execution instead of direct main branch execution
+* Added manual simulation of orphan resources for testing cost leakage scenarios
 
-* report.json → structured output
-* summary.md → human-readable report
+## Trade-offs
 
----
+* Did not integrate real AWS accounts due to cost and security constraints
+* No persistent database for scan history (currently file-based reporting only)
+* No centralized dashboard (reports are static JSON/Markdown outputs)
+* Limited scaling design (single-run batch scanner instead of continuous monitoring)
+* No advanced policy engine (like OPA or AWS Config) implemented yet
 
-# CI/CD Automation
+## AI usage disclosure
 
-On every Pull Request:
+This project was developed with assistance from an AI coding assistant to help with:
 
-* LocalStack starts
-* Terraform provisions infra
-* Orphan resources are created
-* Janitor scans environment
-* Reports are generated
-* PR comment is posted with findings
+* Debugging Terraform and LocalStack configuration issues
+* Designing Python-based resource scanning logic
+* Structuring GitHub Actions CI/CD workflow
+* Improving documentation clarity and formatting
 
----
-
-# Project Structure Reference
-
-See detailed setup and execution guide here:
-
-👉 `docs/nimbuskart_cost_janitor_project_docs`
-
----
-
-# Technologies Used
-
-* Terraform
-* Python (boto3)
-* LocalStack
-* Docker
-* GitHub Actions
-* AWS CLI
-
----
-
-# Outcome
-
-This project demonstrates real-world FinOps practices including:
-
-* Cost leakage detection
-* Infrastructure governance
-* CI/CD automation
-* Cloud resource lifecycle management
-
----
-
-# Author
-
-Chetan Patil
+All final decisions, implementation, and validation were reviewed and applied manually by the developer.

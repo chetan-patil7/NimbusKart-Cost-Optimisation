@@ -1,78 +1,83 @@
+```markdown
 # DESIGN.md
 
-## 1. Multi-Cloud Architecture
+## 1. Multi-Cloud Design (AWS → GCP → Azure)
 
-To support AWS, GCP, and Azure without rewriting the core logic, the Janitor should follow a provider abstraction model.
+The current Janitor is designed around AWS SDK calls (boto3). To support multiple cloud providers without rewriting the core logic, the system must be split into **three clear layers**:
 
-### Proposed Structure
+### Proposed Architecture
 
-```text
+```
+
 janitor/
 ├── core/
-│   ├── scanner.py
-│   ├── reporter.py
-│   └── policies.py
+│   ├── engine.py          # Orchestration logic (scan → evaluate → report)
+│   ├── normalizer.py      # Converts provider output into common schema
+│   ├── policy_engine.py   # Rules: orphan detection, tag validation, age checks
 │
 ├── providers/
 │   ├── aws/
+│   │   ├── ec2.py
+│   │   ├── ebs.py
+│   │   ├── eip.py
+│   │   └── s3.py
+│   │
 │   ├── gcp/
+│   │   ├── compute.py
+│   │   ├── disk.py
+│   │   └── network.py
+│   │
 │   └── azure/
-```
+│       ├── vm.py
+│       ├── disk.py
+│       └── network.py
+│
+└── shared/
+├── models.py          # Unified resource model
+└── constants.py
 
-### Responsibilities
+````
 
-- core/scanner.py
-  - Executes scan workflow
-  - Aggregates findings
-  - Applies deletion policies
+### Key Idea: Normalized Resource Model
 
-- providers/aws/
-  - AWS-specific SDK calls
-  - Maps resources into normalized schema
-
-- providers/gcp/
-  - Uses Google Cloud SDK
-  - Returns normalized findings
-
-- providers/azure/
-  - Uses Azure SDK
-  - Returns normalized findings
-
-### Normalized Resource Model
-
-Each provider returns:
+Every provider MUST convert resources into a common structure:
 
 ```json
 {
-  "resource_id": "",
-  "resource_type": "",
-  "region": "",
-  "tags": {}
+  "resource_id": "string",
+  "resource_type": "ebs_volume | vm | ip | snapshot",
+  "region": "string",
+  "state": "string",
+  "tags": {},
+  "created_at": "timestamp",
+  "cost_per_month": "float"
 }
-```
+````
 
-This allows the core engine to remain cloud-agnostic.
+### Why this works
+
+* Core engine never calls AWS/GCP/Azure directly
+* Only provider adapters change per cloud
+* Policy engine remains unchanged across clouds
+* Enables scaling to multi-account + multi-cloud FinOps
 
 ---
 
 ## 2. IAM Permissions
 
-### Dry Run Mode
+### Dry-run mode (read-only)
 
-Requires read-only permissions:
-- ec2:DescribeInstances
-- ec2:DescribeVolumes
-- ec2:DescribeAddresses
-- ec2:DescribeSnapshots
-- s3:ListBucket
-- s3:GetBucketTagging
+Janitor only inspects resources. It must NOT modify anything.
 
-### Delete Mode
+Required permissions:
 
-Additional permissions:
-- ec2:DeleteVolume
-- ec2:TerminateInstances
-- ec2:ReleaseAddress
+* ec2:DescribeInstances
+* ec2:DescribeVolumes
+* ec2:DescribeAddresses
+* ec2:DescribeSnapshots
+* ec2:DescribeTags
+* s3:ListAllMyBuckets
+* s3:GetBucketTagging
 
 ### Minimal Read-Only IAM Policy
 
@@ -81,13 +86,15 @@ Additional permissions:
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ReadOnlyCostJanitor",
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeInstances",
         "ec2:DescribeVolumes",
         "ec2:DescribeAddresses",
         "ec2:DescribeSnapshots",
-        "s3:ListBucket",
+        "ec2:DescribeTags",
+        "s3:ListAllMyBuckets",
         "s3:GetBucketTagging"
       ],
       "Resource": "*"
@@ -96,51 +103,124 @@ Additional permissions:
 }
 ```
 
----
+### Delete mode (additional permissions)
 
-## 3. Safety Net
+Only enabled in explicit execution mode:
 
-### Failure Mode 1
-Deleting a stopped EC2 instance used for disaster recovery.
-
-### Guardrail
-- Require minimum age threshold
-- Require approval workflow before deletion
-- Skip Protected=true resources
+* ec2:TerminateInstances
+* ec2:DeleteVolume
+* ec2:ReleaseAddress
+* s3:DeleteObject (future extension)
 
 ---
 
-### Failure Mode 2
-Deleting unattached EBS volumes containing manual backups.
+## 3. Safety Nets (Failure Modes)
 
-### Guardrail
-- Snapshot before deletion
-- Require owner notification
-- Add quarantine period before permanent deletion
+### Failure Mode 1: Deleting "stopped but critical" recovery instances
+
+Problem:
+Some stopped EC2 instances are intentionally kept for:
+
+* disaster recovery
+* debugging production incidents
+* batch job reruns
+
+Naïve deletion would remove recovery capability.
+
+Guardrails:
+
+* Require tag: `Protected=true`
+* Add minimum age threshold for deletion eligibility
+* Require instance classification tag: `Tier != "critical"`
+* Introduce quarantine mode before deletion (mark → wait → delete)
 
 ---
 
-## 4. Observability
+### Failure Mode 2: Deleting unattached EBS volumes that contain backups
+
+Problem:
+Not all unattached volumes are waste. Some are:
+
+* manual snapshots
+* backup staging disks
+* forensic investigation data
+
+Guardrails:
+
+* Snapshot volume before deletion
+* Check tag: `Backup=true` → never delete
+* Introduce retention window (e.g., 7–30 days)
+* Require owner confirmation for large volumes (>100GB)
+
+---
+
+## 4. Observability Strategy
+
+The goal is to measure:
+
+* waste detection efficiency
+* execution reliability
+* cost impact
 
 ### Metrics
 
-| Metric | Source | Alert Threshold |
-|---|---|---|
-| orphan_resources_total | Janitor scan | > 20 |
-| estimated_monthly_waste_usd | Report aggregation | > $500 |
-| janitor_scan_duration_seconds | Workflow runtime | > 300 sec |
-| deletion_failures_total | Delete operations | > 0 |
-| untagged_resources_total | Tag scanner | > 10 |
+#### 1. orphan_resources_total
 
-### Publishing Targets
+* Source: Janitor scan output
+* Alert threshold: > 20
+* Meaning: excessive waste detected
 
-- CloudWatch (AWS)
-- Prometheus
-- Grafana dashboards
-- Slack alerting via webhook
+#### 2. estimated_monthly_waste_usd
+
+* Source: report.json aggregation
+* Alert threshold: > 500 USD
+* Meaning: cost inefficiency spike
+
+#### 3. janitor_scan_duration_seconds
+
+* Source: CI workflow runtime
+* Alert threshold: > 300 seconds
+* Meaning: scalability issue or API bottleneck
+
+#### 4. deletion_failures_total
+
+* Source: delete mode execution logs
+* Alert threshold: > 0
+* Meaning: partial cleanup failure
+
+#### 5. untagged_resources_total
+
+* Source: tag validation scanner
+* Alert threshold: > 10
+* Meaning: governance violation trend
+
+### Where to publish
+
+* AWS CloudWatch (primary in AWS setup)
+* Prometheus + Grafana (multi-cloud expansion)
+* Slack webhook alerts (FinOps notifications)
 
 ---
 
-## 5. What Was Intentionally Left Out
+## 5. What Was NOT Built (Scope Decisions)
 
-This implementation intentionally avoids real AWS account execution, distributed scheduling, advanced FinOps analytics, RBAC dashboards, and automatic remediation approval systems. The focus was to build a safe, locally reproducible proof-of-concept that demonstrates Infrastructure as Code, orphan resource detection, CI/CD integration, tagging governance, and safe deletion workflows without incurring real cloud costs.
+This implementation intentionally avoids production-grade complexity such as:
+
+* Distributed scheduling (Airflow / EventBridge / Kubernetes CronJobs)
+* Multi-account AWS Organizations integration
+* Real billing data ingestion (CUR reports, Cost Explorer API)
+* Machine learning-based waste prediction
+* Automated approval workflows for deletions
+* Role-based access control dashboards
+
+The system is designed as a **safe, local-first FinOps simulation platform**, focusing on:
+
+* Infrastructure as Code correctness
+* Orphan resource detection logic
+* CI/CD integration
+* Safety-first deletion design patterns
+
+Production systems would extend this with real billing pipelines, multi-account governance, and approval-based remediation workflows.
+
+```
+```
