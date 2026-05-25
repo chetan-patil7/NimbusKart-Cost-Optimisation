@@ -59,31 +59,7 @@ python janitor/janitor.py --dry-run
 
 ## Architecture
 
-```
-+-------------------+        +------------------+
-|   GitHub Actions  | -----> |   LocalStack     |
-| (CI/CD Pipeline)  |        | (AWS Emulator)   |
-+-------------------+        +------------------+
-           |                          |
-           v                          v
-+-------------------+        +------------------+
-|   Terraform       | -----> | AWS Resources     |
-| (IaC Provisioning)|        | EC2 / EBS / EIP   |
-+-------------------+        +------------------+
-           |
-           v
-+-------------------+
-| Python Janitor    |
-| (Cost Scanner)    |
-+-------------------+
-           |
-           v
-+-------------------+
-| Reports           |
-| report.json       |
-| summary.md        |
-+-------------------+
-```
+<img width="1536" height="1024" alt="NimbusKart Architecture" src="https://github.com/user-attachments/assets/276967f7-3bb5-4020-b955-fdc183899736" />
 
 ## Decisions & deviations
 
@@ -118,6 +94,5 @@ It was corrected to `http://localhost:4566` after testing.
 
 ### Manual Work
 CI/CD workflow debugging and fixing LocalStack execution timing was done manually due to environment-specific behavior.
-```
 
 All final decisions, implementation, and validation were reviewed and applied manually by myself.
