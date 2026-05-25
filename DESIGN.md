@@ -1,5 +1,3 @@
----
-
 # 1. Multi-Cloud Reality
 
 Explain:
