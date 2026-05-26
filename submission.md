@@ -12,12 +12,12 @@
 * [x] Part B: Janitor script runs in --dry-run mode and produces report.json
 * [x] Part B: GitHub Actions workflow runs green on a fresh PR
 * [x] Part B: --delete mode respects Protected=true tag
-* [ ] Part C: DESIGN.md is present and within 2 pages
-* [ ] Walkthrough video link below is accessible (unlisted is fine)
+* [x] Part C: DESIGN.md is present and within 2 pages
+* [x] Walkthrough video link below is accessible (unlisted is fine)
 
 ## Walkthrough video
 
-Link (Loom / YouTube unlisted / Google Drive):
+Link (Loom / YouTube unlisted / Google Drive):https://www.loom.com/share/49af935ea85d4ed6ad96742c93080619
 
 Length: max 5 minutes
 
@@ -25,7 +25,7 @@ Length: max 5 minutes
 
 Path to a sample report.json produced by your script:
 
-`samples/report.json`
+`(https://github.com/chetan-patil7/NimbusKart-Cost-Optimisation/blob/main/samples/report.json)`
 
 ## Known limitations
 
